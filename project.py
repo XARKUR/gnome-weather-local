@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Build a source-pinned GNOME Weather fork and matching Shell bridge. No sudo."""
 import argparse
+import datetime
 import hashlib
 import json
 import os
@@ -12,6 +13,7 @@ import sys
 import tempfile
 import zipfile
 from po_compile import compile_catalog
+from install_utils import extension_update
 
 ROOT = Path(__file__).resolve().parent
 UPSTREAM = ROOT / 'upstream/gnome-weather-43.0'
@@ -73,7 +75,7 @@ def build():
     replace(application, 'this.currentLocationController = new CurrentLocationController.CurrentLocationController(this.model);',
             'this.currentLocationController = {autoLocationAvailable: false, currentLocation: null};')
     replace(application, 'Gtk.Window.set_default_icon_name(pkg.name);', "Gtk.Window.set_default_icon_name('org.gnome.Weather');")
-    replace(application, 'GLib.set_application_name(name_prefix + _("Weather"));', "GLib.set_application_name('天气 · 本地版');")
+    replace(application, 'GLib.set_application_name(name_prefix + _("Weather"));', "GLib.set_application_name('gnome-weather-local');")
     replace(application, '''        gwSettings.connect('changed::temperature-unit', function () {
             temperatureAction.state = resolveDefaultTemperatureUnit(gwSettings.get_enum('temperature-unit'));
         });''', '''        gwSettings.connect('changed::temperature-unit', () => {
@@ -88,7 +90,7 @@ def build():
     update() {
         this._stack.visible_child_name = 'loading';''')
     replace(source / 'src/app/window.js', 'this._searchView.icon_name = pkg.name;', "this._searchView.icon_name = 'org.gnome.Weather';")
-    replace(source / 'src/app/window.js', 'application_name: _("Weather"),', "application_name: '天气 · 本地版',")
+    replace(source / 'src/app/window.js', 'application_name: _("Weather"),', "application_name: 'gnome-weather-local',")
     replace(source / 'src/app/window.js', 'developer_name: _("The GNOME Project"),', "developer_name: 'GNOME Weather contributors / 本地修改版',")
     replace(source / 'src/app/window.js', 'application_icon: pkg.name,', "application_icon: 'org.gnome.Weather',")
     replace(source / 'src/misc/util.js', "import GWeather from 'gi://GWeather';",
@@ -156,7 +158,7 @@ Gio.resources_register(Gio.Resource.load(root + '/resources/app.gresource'));
 Gtk.init();
 Gtk.IconTheme.get_for_display(Gdk.Display.get_default()).add_search_path(root + '/source/data/icons');
 globalThis.pkg = {
-    name: 'org.gnome.Weather.Local', version: '0.1.2 (based on GNOME Weather 43.0)',
+    name: 'org.gnome.Weather.Local', version: '0.1.3 (based on GNOME Weather 43.0)',
     initFormat() {String.prototype.format = imports.format.format;},
     initGettext() {
         imports.gettext.bindtextdomain('org.gnome.Weather.Local', root + '/locale');
@@ -183,7 +185,7 @@ exec gjs -m "$project_build/app.js" "$@"
         bridge.mkdir(exist_ok=True)
         (bridge / 'schemas').mkdir(exist_ok=True)
         shutil.copyfile(schema_dir / (APP_ID + '.gschema.xml'), bridge / 'schemas' / (APP_ID + '.gschema.xml'))
-        metadata = dict(uuid=UUID, name='天气 · 本地版', description='Open-Meteo 天气来源；与天气 · 本地版应用同步地点。', version=3)
+        metadata = dict(uuid=UUID, name='gnome-weather-local', description='Open-Meteo 天气来源；与gnome-weather-local应用同步地点。', version=4)
         metadata['shell-version'] = ['43'] if major == '43' else ['48', '51']
         (bridge / 'metadata.json').write_text(json.dumps(metadata, ensure_ascii=False, indent=2) + '\n')
         if major == 'modern':
@@ -293,7 +295,7 @@ def install():
         launcher = staging / 'launcher.desktop'
         launcher.write_text(f'''[Desktop Entry]
 Type=Application
-Name=天气 · 本地版
+Name=gnome-weather-local
 Comment=Open-Meteo 天气，支持城市搜索和自定义经纬度
 Exec="{target / 'weather-local'}"
 Icon=org.gnome.Weather.Local
@@ -331,24 +333,52 @@ def setup():
     run('gjs', '-c', "imports.gi.versions.Gtk = '4.0'; imports.gi.versions.Soup = '3.0'; "
         "imports.gi.versions.GWeather = '4.0'; const {Gtk, Adw, Soup, GWeather, Geoclue} = imports.gi;")
     build()
-    install()
-    env = dict(os.environ)
-    bus = Path('/run/user') / str(os.getuid()) / 'bus'
-    if bus.exists():
-        env.setdefault('XDG_RUNTIME_DIR', str(bus.parent))
-        env.setdefault('DBUS_SESSION_BUS_ADDRESS', 'unix:path=' + str(bus))
-    # Shell may only discover newly installed extensions at the next login.
-    # Save the enabled preference without restarting or logging out the user.
-    run('gjs', '-c', "const Gio = imports.gi.Gio; "
-        "const settings = new Gio.Settings({schema_id: 'org.gnome.shell'}); "
-        "const enabled = settings.get_strv('enabled-extensions'); "
-        "if (!enabled.includes('weather@system.local')) "
-        "settings.set_strv('enabled-extensions', [...enabled, 'weather@system.local']); "
-        "const disabled = settings.get_strv('disabled-extensions'); "
-        "if (disabled.includes('weather@system.local')) "
-        "settings.set_strv('disabled-extensions', disabled.filter(id => id !== 'weather@system.local')); "
-        "Gio.Settings.sync();", env=env)
-    print('安装完成：从应用列表打开“天气 · 本地版”。首次安装扩展后请注销并重新登录。')
+    share = Path.home() / '.local/share'
+    target = share / 'system-weather'
+    extension = share / 'gnome-shell/extensions' / UUID
+    desktop = share / 'applications' / (APP_ID + '.desktop')
+    icon = share / 'icons/hicolor/scalable/apps' / (APP_ID + '.svg')
+    paths = [target, extension, desktop, icon]
+    for path in paths:
+        if path.is_symlink():
+            raise RuntimeError('Refusing to replace an installation symlink: ' + str(path))
+    owned = False
+    if target.exists():
+        bootstrap = target / 'bootstrap.js'
+        if not bootstrap.is_file() or "name: 'org.gnome.Weather.Local'" not in bootstrap.read_text():
+            raise RuntimeError('Existing application directory is not gnome-weather-local.')
+        owned = True
+    if extension.exists():
+        if json.loads((extension / 'metadata.json').read_text()).get('uuid') != UUID:
+            raise RuntimeError('Existing extension has a different identity.')
+        owned = True
+    if desktop.exists():
+        if f'Exec="{target / "weather-local"}"' not in desktop.read_text():
+            raise RuntimeError('Existing launcher has a different identity.')
+        owned = True
+    if icon.exists() and not owned:
+        raise RuntimeError('Existing icon has no matching application installation.')
+    existing = [path for path in paths if path.exists()]
+    backup = None
+    if existing:
+        backup = share / 'gnome-extension-project-backups/gnome-weather-local' / datetime.datetime.now().strftime('%Y%m%d-%H%M%S-%f')
+        backup.mkdir(parents=True)
+    with extension_update(UUID):
+        moved = []
+        try:
+            for i, path in enumerate(existing):
+                saved = backup / str(i)
+                path.rename(saved)
+                moved.append((path, saved))
+            install()
+        except BaseException:
+            for path, saved in reversed(moved):
+                saved.rename(path)
+            raise
+    if backup:
+        print('Previous installation backed up:', backup)
+    print('安装完成：从应用列表打开 gnome-weather-local。请注销并重新登录，以加载日历扩展。')
+
 
 
 if __name__ == '__main__':

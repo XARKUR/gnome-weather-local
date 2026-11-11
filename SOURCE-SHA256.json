@@ -1,8 +1,8 @@
 {
-  "project.py": "166359ba8f51f71a85d7f3c16587eef317baaf7365980fe40dbb2b39999a3966",
+  "project.py": "e9809621c9c51ae1fc15aaaa4af8b692f52a29361df6fd11da7b5f72ef7453ef",
   "po_compile.py": "ac5bcc997c12eb3431758c703a4cd49d073d240c00f9761113bd7d6c9bf33bc1",
-  "README.md": "d8454a90ed3f4485e3332f8bbf5013862e8fd2e7625e80f5fadeb1cdb9b2ccbd",
-  "NOTICE": "df3ca497126ef858ccab5e6b287ee00938d72279cd6f0d958b3a2a317f4437f0",
+  "README.md": "5efd6296a9b1e08b56538f6942d48add23afe5ee8e4359d6555e1954ef48e491",
+  "NOTICE": "bc10d28a6252c2923a57ad86e425b8544536410891725133f52079c9d1e35484",
   "upstream.lock.json": "d3e58469989d57f8fa7da25a3073591e6d5dcd078e24fdf4eceae49c80a78d1c",
   "overrides/bridge.js": "ca47c17e72bc4d20b7530718ae50c0b58e1ea174b1b49908c5ddfc3b3b8346b8",
   "overrides/entry.js": "e095953568d306bafc3acff6d8cda1f995b99b178332cd41fc3ab82f22a40f84",
@@ -15,9 +15,11 @@
   "tests/ui.js": "57bc5775653463c999bb52f88715c258cbb3d6d3ecf8fdaa4a7e926c4d9471ef",
   "po/zh_CN.po": "aea33ec07dc99aef8219467e634d12acb33d42e088b6b9c70ffe11835035083f",
   "tests/regions-live.js": "2bf6f5ed4251da43928328b45d6ef503bf313885ff0da57b1c5ca1324777558c",
-  "install.sh": "94c44ad93d347e81e9f8224a619c2c9ed6463263df2522d7a7b6d29d0f0338ca",
+  "install.sh": "39bf5ea8e3cb02f6b4354c7fd9bba4057558bed855493a81533b14e25decc78b",
   "resources/app.gresource": "f9520d11019732bab2b666e3accddfe569bb299812c162160678f22d3e532866",
   "resources/manifest.json": "5fe162cc7e9f9160acfeb43c78051810cad47f6f366bf47e934224037d170a1b",
-  "tests/test_setup.py": "b90d10a83281252fd44b4ab7839cf4c4865134ea41d1ddd60c3283d7a10a438f",
-  "tests/isolated.js": "f37c7363166ad56a5b0d6fb9014cd49d682343ca62d84bcf38436b95d8de0e7e"
+  "tests/test_setup.py": "22169c5a20fe36d67987f45bc11f82a126004d86ea60999a8970e7e5341210c2",
+  "tests/isolated.js": "f37c7363166ad56a5b0d6fb9014cd49d682343ca62d84bcf38436b95d8de0e7e",
+  "install_utils.py": "bb5eb2eceb11eb3a3863cfc4f243d9ab87572a0ffc3c42c8ee8dcd13999f8144",
+  "tests/test_bootstrap.py": "17f34c0a13b75a93b8f1e07853f215305a9011e25b45e544b5a53c85fa3ac89c"
 }

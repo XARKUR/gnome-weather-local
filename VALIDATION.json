@@ -1,5 +1,20 @@
 {
   "project": "gnome-weather-local",
-  "record": "Historical validation summary; personal desktop setup and installation records removed.",
-  "details": "See current main branch for supported versions and automated verification."
+  "shell_versions": [
+    "43",
+    "48",
+    "51"
+  ],
+  "version": 4,
+  "automated_validation": {
+    "status": "passed",
+    "scope": "Temporary installation directories, memory settings backend, simulated Shell actors and isolated application tests",
+    "python_test_count": 10,
+    "streamed_installer": "Local archive fixture dispatch and archive traversal rejection passed",
+    "update_tests": "Existing installation backup and failure recovery passed"
+  },
+  "desktop_validation": {
+    "previous_versions": "GNOME 43, 48 and 51 compatibility verified for earlier versions",
+    "current_version": "Visual acceptance pending; automated tests do not establish theme or scaling compatibility"
+  }
 }

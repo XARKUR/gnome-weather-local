@@ -15,6 +15,43 @@ import project
 
 
 class PortableBuildTests(unittest.TestCase):
+    def setup_in_home(self, home):
+        import install_utils
+        self.shell_state = {'enabled-extensions': ['unrelated@example', project.UUID],
+                            'disabled-extensions': []}
+        original_state = {key: list(value) for key, value in self.shell_state.items()}
+        with patch.object(project.Path, 'home', return_value=home), \
+                patch.object(project.os, 'geteuid', return_value=1000), \
+                patch.object(project.subprocess, 'check_output', return_value='GNOME Shell 48.7'), \
+                patch.object(project.shutil, 'which', side_effect=lambda name: '/usr/bin/' + name if name in ['gjs', 'glib-compile-schemas'] else None), \
+                patch.object(install_utils, 'read_shell_state', return_value=original_state), \
+                patch.object(install_utils, 'write_shell_state', side_effect=lambda state: self.shell_state.update(state)), \
+                contextlib.redirect_stdout(io.StringIO()):
+            project.setup()
+
+    def test_setup_updates_owned_installation_and_keeps_backup(self):
+        home = self.root / 'home'
+        self.setup_in_home(home)
+        target = home / '.local/share/system-weather'
+        (target / 'marker').write_text('previous version')
+        self.setup_in_home(home)
+        self.assertFalse((target / 'marker').exists())
+        backups = list((home / '.local/share/gnome-extension-project-backups/gnome-weather-local').glob('*/0/marker'))
+        self.assertEqual(len(backups), 1)
+        self.assertEqual(backups[0].read_text(), 'previous version')
+        self.assertEqual(self.shell_state['enabled-extensions'], ['unrelated@example', project.UUID])
+
+    def test_setup_failure_restores_old_application_and_shell_state(self):
+        home = self.root / 'home'
+        self.setup_in_home(home)
+        target = home / '.local/share/system-weather'
+        (target / 'marker').write_text('keep me')
+        with patch.object(project, 'install', side_effect=RuntimeError('fixture update failure')):
+            with self.assertRaisesRegex(RuntimeError, 'fixture update failure'):
+                self.setup_in_home(home)
+        self.assertEqual((target / 'marker').read_text(), 'keep me')
+        self.assertEqual(self.shell_state['enabled-extensions'], ['unrelated@example', project.UUID])
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix='weather-portable-test-')
         self.addCleanup(self.temp.cleanup)
