@@ -39,6 +39,9 @@ app.connect('activate', () => {
             print(`${name}: API province → search subtitle → actual selection → reopened saved-list subtitle = ${expected}`);
         }
     })().catch(error => {failure = error;}).finally(() => {
+        // Unroot JS widgets while the JS context is alive. New GTK releases
+        // otherwise defer this until the application's final garbage collection.
+        window.set_child(null);
         window.destroy();
         app.release();
         app.quit();
