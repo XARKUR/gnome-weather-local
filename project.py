@@ -48,6 +48,27 @@ def build():
     model = source / 'src/shared/world.js'
     replace(model, "import GWeather from 'gi://GWeather';", "import GWeather from 'gi://GWeather';\nimport {OpenMeteoInfo} from './provider.js';")
     replace(model, 'return new GWeather.Info({', 'return new OpenMeteoInfo({')
+    replace(model, '''    #invalidate() {
+        this.getAll();
+        this.items_changed(0, this._allInfos.length, this._allInfos.length);
+    }''', '''    #invalidate() {
+        const removed = this._allInfos.length;
+        this.getAll();
+        this.items_changed(0, removed, this._allInfos.length);
+    }''')
+    replace(model, '''        info.update();
+        this._updateLoadingCount(+1);''', '''        this._updateLoadingCount(+1);
+        info.update();''')
+    replace(model, '''        for (let i = 0; i < this._allInfos.length; i++) {
+            if (this._allInfos[i] == oldInfo) {
+                this.items_changed(i, 1, 0);
+                break;
+            }
+        }
+''', '')
+    replace(model, '''        this.getAll();
+        this._queueSaveSettings();''', '''        this.#invalidate();
+        this._queueSaveSettings();''')
     application = source / 'src/app/application.js'
     replace(application, 'this.currentLocationController = new CurrentLocationController.CurrentLocationController(this.model);',
             'this.currentLocationController = {autoLocationAvailable: false, currentLocation: null};')
@@ -85,12 +106,23 @@ def build():
         local = ROOT / 'tools/glib/usr/bin/glib-compile-resources'
         if local.is_file():
             compiler = str(local)
-    if not compiler:
-        raise RuntimeError('Build dependency missing: glib-compile-resources (Debian 13: libgio-2.0-dev-bin; Debian 12: libglib2.0-dev-bin; Arch: glib2).')
     xml = (source / 'data/org.gnome.Weather.data.gresource.xml').read_text().replace(' preprocess="xml-stripblanks"', '')
     manifest = resources / 'app.gresource.xml'
     manifest.write_text(xml)
-    run(compiler, manifest, '--sourcedir', source / 'data', '--target', resources / 'app.gresource')
+    if compiler:
+        run(compiler, manifest, '--sourcedir', source / 'data', '--target', resources / 'app.gresource')
+    else:
+        bundled = ROOT / 'resources/app.gresource'
+        recorded = json.loads((ROOT / 'resources/manifest.json').read_text())
+        if hashlib.sha256(xml.encode()).hexdigest() != recorded['resource_xml_sha256']:
+            raise RuntimeError('UI resource list changed; rebuild the bundled resources.')
+        for name, digest in recorded['inputs'].items():
+            if hashlib.sha256((source / 'data' / name).read_bytes()).hexdigest() != digest:
+                raise RuntimeError('UI resources changed; rebuild with glib-compile-resources before installing.')
+        if hashlib.sha256(bundled.read_bytes()).hexdigest() != recorded['artifact_sha256']:
+            raise RuntimeError('Bundled UI resource checksum mismatch.')
+        shutil.copyfile(bundled, resources / 'app.gresource')
+        print('Using verified portable UI resources; no resource compiler required.')
     schema = (source / 'data/org.gnome.Weather.gschema.xml').read_text().replace('id="org.gnome.Weather"', f'id="{APP_ID}"').replace('path="/org/gnome/Weather/"', 'path="/org/gnome/Weather/Local/"')
     schema = schema.replace('  </schema>', '''    <key name="location-regions" type="a{ss}">
       <default>{}</default>
@@ -191,6 +223,7 @@ function init() {return new Extension();}
 
 
 def check(live=False):
+    run(sys.executable, '-m', 'unittest', 'discover', '-s', ROOT / 'tests', '-p', 'test_*.py')
     run('gjs', '-m', ROOT / 'tests/provider.js')
     node = shutil.which('node')
     if not node:
@@ -255,9 +288,38 @@ Categories=GNOME;GTK;Utility;
     print('Enable bridge after logout/login:', UUID)
 
 
+def setup():
+    """Install using existing GNOME runtime libraries, with no development tools."""
+    if os.geteuid() == 0:
+        raise RuntimeError('Run ./install.sh as your desktop user, without sudo.')
+    if not shutil.which('gjs') or not shutil.which('glib-compile-schemas'):
+        raise RuntimeError('Missing GNOME runtime: install gjs and libglib2.0-bin first.')
+    run('gjs', '-c', "imports.gi.versions.Gtk = '4.0'; imports.gi.versions.Soup = '3.0'; "
+        "imports.gi.versions.GWeather = '4.0'; const {Gtk, Adw, Soup, GWeather, Geoclue} = imports.gi;")
+    build()
+    install()
+    env = dict(os.environ)
+    bus = Path('/run/user') / str(os.getuid()) / 'bus'
+    if bus.exists():
+        env.setdefault('XDG_RUNTIME_DIR', str(bus.parent))
+        env.setdefault('DBUS_SESSION_BUS_ADDRESS', 'unix:path=' + str(bus))
+    # Shell may only discover newly installed extensions at the next login.
+    # Save the enabled preference without restarting or logging out the user.
+    run('gjs', '-c', "const Gio = imports.gi.Gio; "
+        "const settings = new Gio.Settings({schema_id: 'org.gnome.shell'}); "
+        "const enabled = settings.get_strv('enabled-extensions'); "
+        "if (!enabled.includes('weather@system.local')) "
+        "settings.set_strv('enabled-extensions', [...enabled, 'weather@system.local']); "
+        "const disabled = settings.get_strv('disabled-extensions'); "
+        "if (disabled.includes('weather@system.local')) "
+        "settings.set_strv('disabled-extensions', disabled.filter(id => id !== 'weather@system.local')); "
+        "Gio.Settings.sync();", env=env)
+    print('安装完成：从应用列表打开“天气 · 本地版”。首次安装扩展后请注销并重新登录。')
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('command', choices=['build', 'check', 'install'])
+    parser.add_argument('command', choices=['build', 'check', 'install', 'setup'])
     parser.add_argument('--live', action='store_true', help='Test the two public APIs with the requested city names')
     parser.add_argument('--apply', action='store_true')
     args = parser.parse_args()
@@ -265,4 +327,5 @@ if __name__ == '__main__':
         parser.error('install requires --apply')
     if args.command == 'build': build()
     elif args.command == 'check': check(args.live)
+    elif args.command == 'setup': setup()
     else: install()

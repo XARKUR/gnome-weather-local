@@ -32,6 +32,36 @@ const hourly = {};
 for (const [key, value] of Object.entries(sample))
     hourly[key] = Array.from({length: 168}, (_, i) => key === 'time' ? now + i * 3600 : value);
 info._apply({current: sample, hourly});
+// Real GTK list binding: notifications must describe the old and new lengths,
+// including cached updates that synchronously emit "updated".
+const model = this.model;
+const originalBuildInfo = model.buildInfo;
+model.buildInfo = function (place) {
+    const result = originalBuildInfo.call(this, place);
+    result._apply({current: sample, hourly});
+    return result;
+};
+let publishedCount = model.get_n_items();
+const notificationErrors = [];
+const signal = model.connect('items-changed', (_model, position, removed, added) => {
+    if (position > publishedCount || removed > publishedCount - position)
+        notificationErrors.push('Removed items not present in the old model');
+    publishedCount += added - removed;
+    if (publishedCount !== model.get_n_items()) notificationErrors.push('Published length differs from actual model');
+});
+const first = model.addNewLocation(location);
+const other = GWeather.Location.new_detached('成都', null, 30.66667, 104.06667);
+rememberProvince(other, '四川省');
+const second = model.addNewLocation(other);
+model.setSelectedLocation(first);
+model.removeLocation(second);
+if (notificationErrors.length || model.get_n_items() !== 1 || model.loading)
+    throw new Error('Location model update failed: ' + notificationErrors.join(', '));
+if (!window._worldView._listbox.get_row_at_index(0) || window._worldView._listbox.get_row_at_index(1))
+    throw new Error('GTK saved-place list does not match model');
+model.disconnect(signal);
+model.buildInfo = originalBuildInfo;
+print('Location list: add, select, delete, native GTK binding and synchronous cached updates passed.');
 window.showInfo(info, false);
 const stack = window._cityView.getForecastStack();
 const titles = ['hourly', 'daily'].map(name => stack.get_page(stack.get_child_by_name(name)).get_title());

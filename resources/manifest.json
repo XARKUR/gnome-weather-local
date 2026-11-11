@@ -1,0 +1,16 @@
+{
+  "artifact_sha256": "f9520d11019732bab2b666e3accddfe569bb299812c162160678f22d3e532866",
+  "inputs": {
+    "city.ui": "63b9a4c4a4460bb4ff0b4ca6b68bef2df60086c587f1d81fc12bfe8cb4c9fde1",
+    "places-popover.ui": "3f6e735fbd0b4f1b904ce69d93b79e832995052f4047fcb98cfd73659f7fc391",
+    "weather-widget.ui": "a84b1803f7402aaffa16bbf3e1f89a4f5d01cbef0da25e80e898d369c8de7df7",
+    "window.ui": "04c0707516ef6dbb97f6133930ee4794612c21e6877100d1e7911ab204812833",
+    "hour-entry.ui": "577aa7bfeb3c234006cd55924d14ac11bcfc5eca9ad3f7e49cc47004a8d809d8",
+    "day-entry.ui": "4996600b951d97f1f4d64e34162b605213c37c1e906f17b60f8952cfb856b632",
+    "style.css": "cb5e61024ed96231a6e40f8204111f9ae43bd359551812f23b717437e53636bb",
+    "style-dark.css": "580603f1b7ca6b5d07d379a83ae61de772f2695125739edac8a94ae319b7ae6e",
+    "style-hc.css": "81528e0e06ca32127ad4e4eb8036e5b34a9d3063c73f46829beddf202b0ea099",
+    "ShellWeatherIntegration.xml": "819a4758f65bb8b1feb28cedb12d491ff8deacc82092e12180c11b30aa64b266"
+  },
+  "resource_xml_sha256": "65cc6eef8074d9d767f729b6b0f6f3a3c2e2b3226b9f6bc96d736ef9b52554d8"
+}

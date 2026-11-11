@@ -1,5 +1,5 @@
 {
-  "project.py": "9e2ec14ee5fc27dc7a277f278869318781010dcd3f90a6b6f23a659bec77f7f9",
+  "project.py": "ae7902ab69c1d2415afa4ee4a91faf5de819204828dd78fad3e042cbd8a8859c",
   "po_compile.py": "ac5bcc997c12eb3431758c703a4cd49d073d240c00f9761113bd7d6c9bf33bc1",
   "README.md": "d8454a90ed3f4485e3332f8bbf5013862e8fd2e7625e80f5fadeb1cdb9b2ccbd",
   "NOTICE": "df3ca497126ef858ccab5e6b287ee00938d72279cd6f0d958b3a2a317f4437f0",
@@ -12,7 +12,11 @@
   "tests/live.js": "44b7bc6af794aecee8ce3a1c1adca75ee26a00d37b2b3136cf97443629985575",
   "tests/native-weather.json": "884ff16206761f1860c2487022a6bf3f546f5587f99536ad4c1f3cf7517948f4",
   "tests/provider.js": "152f3be00942b83033ba75f319f488ebadfd3832fff85a1ce19a842a04cbf08d",
-  "tests/ui.js": "84b0b59143e8f72712c54e1f148e8423a65528dec33b7bf8d8f3c86cfb4c2824",
+  "tests/ui.js": "769f15b7b53329aef38be562d6903af9c13874caa2b827317b9c89de1ba96bd2",
   "po/zh_CN.po": "aea33ec07dc99aef8219467e634d12acb33d42e088b6b9c70ffe11835035083f",
-  "tests/regions-live.js": "525073d956de64b981f1e4f117713851fda22fd256c8fb7458d12d9be0d8c89f"
+  "tests/regions-live.js": "525073d956de64b981f1e4f117713851fda22fd256c8fb7458d12d9be0d8c89f",
+  "install.sh": "94c44ad93d347e81e9f8224a619c2c9ed6463263df2522d7a7b6d29d0f0338ca",
+  "resources/app.gresource": "f9520d11019732bab2b666e3accddfe569bb299812c162160678f22d3e532866",
+  "resources/manifest.json": "5fe162cc7e9f9160acfeb43c78051810cad47f6f366bf47e934224037d170a1b",
+  "tests/test_setup.py": "9342e7374595e7545064e097cc92e9e6cf1e2bfdc2df5046753c113ff9ec84af"
 }
