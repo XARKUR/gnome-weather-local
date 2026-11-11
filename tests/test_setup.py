@@ -22,6 +22,8 @@ class PortableBuildTests(unittest.TestCase):
         for directory in ['upstream', 'overrides', 'po', 'resources']:
             shutil.copytree(ROOT / directory, self.root / directory)
         shutil.copyfile(ROOT / 'LICENSE-GPL-3', self.root / 'LICENSE-GPL-3')
+        for name in ['README.md', 'NOTICE', 'upstream.lock.json']:
+            shutil.copyfile(ROOT / name, self.root / name)
         self.addCleanup(patch.stopall)
         patch.multiple(project, ROOT=self.root, UPSTREAM=self.root / 'upstream/gnome-weather-43.0',
                        BUILD=self.root / 'build').start()
@@ -48,6 +50,56 @@ class PortableBuildTests(unittest.TestCase):
         style.write_text(style.read_text() + '\n/* changed */\n')
         with self.assertRaisesRegex(RuntimeError, 'UI resources changed'):
             self.build()
+
+    def install_in_home(self, home):
+        with patch.object(project.Path, 'home', return_value=home), \
+                patch.object(project.os, 'geteuid', return_value=1000), \
+                patch.object(project.subprocess, 'check_output', return_value='GNOME Shell 48.7'), \
+                contextlib.redirect_stdout(io.StringIO()):
+            project.install()
+
+    def test_install_publishes_complete_user_app_and_bridge(self):
+        self.build()
+        home = self.root / 'home'
+        self.install_in_home(home)
+        share = home / '.local/share'
+        self.assertTrue((share / 'system-weather/schemas/gschemas.compiled').is_file())
+        self.assertTrue((share / 'gnome-shell/extensions/weather@system.local/extension.js').is_file())
+        self.assertTrue((share / 'applications/org.gnome.Weather.Local.desktop').is_file())
+        self.assertTrue((share / 'icons/hicolor/scalable/apps/org.gnome.Weather.Local.svg').is_file())
+        self.assertEqual(list(share.glob('.weather-install-*')), [])
+
+    def test_failed_publication_rolls_back_for_retry(self):
+        self.build()
+        home = self.root / 'home'
+        rename = Path.rename
+
+        def fail_launcher(path, destination):
+            if path.name == 'launcher.desktop':
+                raise OSError('Simulated installation failure')
+            return rename(path, destination)
+
+        with patch.object(Path, 'rename', fail_launcher), \
+                self.assertRaisesRegex(OSError, 'Simulated'):
+            self.install_in_home(home)
+        share = home / '.local/share'
+        self.assertFalse((share / 'system-weather').exists())
+        self.assertFalse((share / 'gnome-shell/extensions/weather@system.local').exists())
+        self.assertEqual(list(share.glob('.weather-install-*')), [])
+        self.install_in_home(home)
+        self.assertTrue((share / 'system-weather/weather-local').is_file())
+
+    def test_existing_icon_is_preserved_before_installation(self):
+        self.build()
+        home = self.root / 'home'
+        share = home / '.local/share'
+        icon = share / 'icons/hicolor/scalable/apps/org.gnome.Weather.Local.svg'
+        icon.parent.mkdir(parents=True)
+        icon.write_text('Existing icon')
+        with self.assertRaisesRegex(RuntimeError, 'Refusing to overwrite'):
+            self.install_in_home(home)
+        self.assertEqual(icon.read_text(), 'Existing icon')
+        self.assertFalse((share / 'system-weather').exists())
 
 
 if __name__ == '__main__':

@@ -37,5 +37,30 @@ units.set_string('temperature-unit', 'centigrade');
 assert(info.get_value_temp(GWeather.TemperatureUnit.DEFAULT)[1] === 20, 'Switch back to Celsius');
 assert(info.get_forecast_list().length === 2, 'Hourly forecast conversion');
 assert(info.get_forecast_list()[0] instanceof GWeather.Info, 'Typed forecast sample');
+// JSON null must not become a valid 32°F / 0 m/s through numeric coercion.
+const missing = new OpenMeteoInfo({location}, {...sample, temperature_2m: null,
+    apparent_temperature: null, wind_speed_10m: null});
+for (const unit of [GWeather.TemperatureUnit.CENTIGRADE, GWeather.TemperatureUnit.FAHRENHEIT,
+    GWeather.TemperatureUnit.KELVIN]) {
+    assert(!missing.get_value_temp(unit)[0] && Number.isNaN(missing.get_value_temp(unit)[1]), 'Missing temperature became valid');
+    assert(!missing.get_value_apparent(unit)[0] && Number.isNaN(missing.get_value_apparent(unit)[1]), 'Missing apparent temperature became valid');
+}
+assert(!missing.get_value_wind(GWeather.SpeedUnit.MS)[0], 'Missing wind became valid calm weather');
+const optionalMissing = new OpenMeteoInfo({location}, {...sample, apparent_temperature: null, wind_speed_10m: null});
+assert(optionalMissing.is_valid(), 'Missing optional fields invalidated the actual temperature');
+assert(!optionalMissing.get_value_apparent(GWeather.TemperatureUnit.FAHRENHEIT)[0] &&
+    Number.isNaN(optionalMissing.get_value_apparent(GWeather.TemperatureUnit.FAHRENHEIT)[1]), 'Missing apparent value was converted');
+assert(!optionalMissing.get_value_wind(GWeather.SpeedUnit.MS)[0], 'Missing optional wind was converted');
+const noHourly = JSON.parse(JSON.stringify(data));
+noHourly.hourly.temperature_2m.fill(null);
+throws(() => validateForecast(noHourly));
+const partial = JSON.parse(JSON.stringify(data));
+partial.hourly.temperature_2m[0] = null;
+info._apply(validateForecast(partial));
+assert(info.get_forecast_list().length === 1, 'Missing hourly temperature must be skipped');
+info._fetchedAt = Date.now() - 25 * 60 * 60 * 1000;
+assert(!info.is_valid(), 'Expired cached weather remains valid');
+assert(!info.get_value_temp(GWeather.TemperatureUnit.FAHRENHEIT)[0], 'Expired temperature getter remains valid');
+assert(info.get_forecast_list().length === 0, 'Expired parent still exposes hourly forecasts');
 info.abort();
-print('Provider: coordinates, incomplete responses, WMO icons, typed native model, units, hourly samples passed.');
+print('Provider: coordinates, incomplete responses, WMO icons, native models, units, missing values and cache expiry passed.');

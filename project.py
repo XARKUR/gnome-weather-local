@@ -156,7 +156,7 @@ Gio.resources_register(Gio.Resource.load(root + '/resources/app.gresource'));
 Gtk.init();
 Gtk.IconTheme.get_for_display(Gdk.Display.get_default()).add_search_path(root + '/source/data/icons');
 globalThis.pkg = {
-    name: 'org.gnome.Weather.Local', version: '0.1.1 (based on GNOME Weather 43.0)',
+    name: 'org.gnome.Weather.Local', version: '0.1.2 (based on GNOME Weather 43.0)',
     initFormat() {String.prototype.format = imports.format.format;},
     initGettext() {
         imports.gettext.bindtextdomain('org.gnome.Weather.Local', root + '/locale');
@@ -183,7 +183,7 @@ exec gjs -m "$project_build/app.js" "$@"
         bridge.mkdir(exist_ok=True)
         (bridge / 'schemas').mkdir(exist_ok=True)
         shutil.copyfile(schema_dir / (APP_ID + '.gschema.xml'), bridge / 'schemas' / (APP_ID + '.gschema.xml'))
-        metadata = dict(uuid=UUID, name='天气 · 本地版', description='Open-Meteo 天气来源；与天气 · 本地版应用同步地点。', version=2)
+        metadata = dict(uuid=UUID, name='天气 · 本地版', description='Open-Meteo 天气来源；与天气 · 本地版应用同步地点。', version=3)
         metadata['shell-version'] = ['43'] if major == '43' else ['48', '51']
         (bridge / 'metadata.json').write_text(json.dumps(metadata, ensure_ascii=False, indent=2) + '\n')
         if major == 'modern':
@@ -262,28 +262,36 @@ def install():
     if os.geteuid() == 0:
         raise RuntimeError('Run as the desktop user, without sudo.')
     target = Path.home() / '.local/share/system-weather'
-    if target.exists():
-        raise RuntimeError('Already installed. Back up/remove the old user copy before updating.')
     shell = subprocess.check_output(['gnome-shell', '--version'], text=True)
-    major = re.search(r'Shell (\d+)', shell)[1]
+    match = re.search(r'Shell (\d+)', shell)
+    major = match[1] if match else None
     if major not in ['43', '48', '51']:
         raise RuntimeError('Bridge requires GNOME 43, 48 or 51.')
     extension = Path.home() / '.local/share/gnome-shell/extensions' / UUID
-    if extension.exists():
-        raise RuntimeError('Refusing to overwrite existing weather bridge.')
     desktop = Path.home() / '.local/share/applications' / (APP_ID + '.desktop')
-    if desktop.exists():
-        raise RuntimeError('Refusing to overwrite an existing launcher.')
-    # Only the runnable files, not development logs or tests, go into user data.
-    target.mkdir(parents=True)
-    for directory in ['source', 'resources', 'schemas', 'locale']:
-        shutil.copytree(BUILD / directory, target / directory)
-    for name in ['app.js', 'bootstrap.js', 'weather-local']:
-        shutil.copy2(BUILD / name, target / name)
-    for name in ['README.md', 'NOTICE', 'upstream.lock.json']:
-        shutil.copyfile(ROOT / name, target / name)
-    desktop.parent.mkdir(parents=True, exist_ok=True)
-    desktop.write_text(f'''[Desktop Entry]
+    icon = Path.home() / '.local/share/icons/hicolor/scalable/apps' / (APP_ID + '.svg')
+    destinations = [target, extension, desktop, icon]
+    for path in destinations:
+        if path.exists() or path.is_symlink():
+            raise RuntimeError('Refusing to overwrite existing installation file: ' + str(path))
+    # Prepare every file before exposing the app or extension. A failed copy or
+    # publication must not leave a partial installation that blocks a retry.
+    share = Path.home() / '.local/share'
+    share.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix='.weather-install-', dir=share) as temp:
+        staging = Path(temp)
+        app = staging / 'app'
+        app.mkdir()
+        for directory in ['source', 'resources', 'schemas', 'locale']:
+            shutil.copytree(BUILD / directory, app / directory)
+        for name in ['app.js', 'bootstrap.js', 'weather-local']:
+            shutil.copy2(BUILD / name, app / name)
+        for name in ['README.md', 'NOTICE', 'upstream.lock.json']:
+            shutil.copyfile(ROOT / name, app / name)
+        bridge = staging / 'bridge'
+        shutil.copytree(BUILD / ('bridge-43' if major == '43' else 'bridge-modern'), bridge)
+        launcher = staging / 'launcher.desktop'
+        launcher.write_text(f'''[Desktop Entry]
 Type=Application
 Name=天气 · 本地版
 Comment=Open-Meteo 天气，支持城市搜索和自定义经纬度
@@ -293,10 +301,23 @@ Terminal=false
 StartupNotify=true
 Categories=GNOME;GTK;Utility;
 ''')
-    icons = Path.home() / '.local/share/icons/hicolor/scalable/apps'
-    icons.mkdir(parents=True, exist_ok=True)
-    shutil.copyfile(target / 'source/data/icons/hicolor/scalable/apps/org.gnome.Weather.svg', icons / (APP_ID + '.svg'))
-    shutil.copytree(BUILD / ('bridge-43' if major == '43' else 'bridge-modern'), extension)
+        staged_icon = staging / 'icon.svg'
+        shutil.copyfile(app / 'source/data/icons/hicolor/scalable/apps/org.gnome.Weather.svg', staged_icon)
+        published = []
+        try:
+            for prepared, destination in zip([app, bridge, launcher, staged_icon], destinations):
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                if destination.exists() or destination.is_symlink():
+                    raise RuntimeError('Installation destination appeared during preparation: ' + str(destination))
+                prepared.rename(destination)
+                published.append(destination)
+        except BaseException:
+            for path in reversed(published):
+                if path.is_dir():
+                    shutil.rmtree(path)
+                else:
+                    path.unlink()
+            raise
     print('Installed separate user app and disabled bridge. Original GNOME Weather unchanged.')
     print('Enable bridge after logout/login:', UUID)
 

@@ -76,6 +76,9 @@ export function validateForecast(data) {
         if (!Array.isArray(data.hourly[field]) || data.hourly[field].length !== data.hourly.time.length)
             throw new Error(`逐小时数据不完整：${field}`);
     }
+    if (!data.hourly.time.some((_time, i) => Number.isFinite(data.hourly.temperature_2m[i]) &&
+        Number.isFinite(data.hourly.weather_code[i])))
+        throw new Error('天气服务没有返回可用的逐小时预报');
     return data;
 }
 function cachePath(location) {
@@ -157,10 +160,11 @@ class OpenMeteoInfo extends GWeather.Info {
     is_valid() {return (!this._data || Date.now() - this._fetchedAt < MAX_STALE) &&
         Number.isFinite(this._sample?.temperature_2m) && Number.isFinite(this._sample?.weather_code);}
     network_error() {return Boolean(this.lastError);}
-    get_forecast_list() {return this._forecasts;}
+    get_forecast_list() {return this.is_valid() ? this._forecasts : [];}
     get_value_update() {return [this.is_valid(), this._sample?.time || 0];}
     get_value_temp(unit) {
         let value = this._sample?.temperature_2m;
+        if (!this.is_valid() || !Number.isFinite(value)) return [false, NaN];
         const real = temperatureUnit(unit);
         if (real === GWeather.TemperatureUnit.FAHRENHEIT) value = value * 9 / 5 + 32;
         else if (real === GWeather.TemperatureUnit.KELVIN) value += 273.15;
@@ -168,6 +172,7 @@ class OpenMeteoInfo extends GWeather.Info {
     }
     get_value_apparent(unit) {
         const value = this._sample?.apparent_temperature;
+        if (!this.is_valid() || !Number.isFinite(value)) return [false, NaN];
         const real = temperatureUnit(unit);
         return [Number.isFinite(value), real === GWeather.TemperatureUnit.FAHRENHEIT ? value * 9 / 5 + 32 :
             real === GWeather.TemperatureUnit.KELVIN ? value + 273.15 : value];
@@ -182,6 +187,8 @@ class OpenMeteoInfo extends GWeather.Info {
     get_humidity() {return Number.isFinite(this._sample?.relative_humidity_2m) ? `${Math.round(this._sample.relative_humidity_2m)}%` : '—';}
     get_value_wind(unit) {
         let speed = this._sample?.wind_speed_10m;
+        if (!this.is_valid() || !Number.isFinite(speed))
+            return [false, NaN, GWeather.WindDirection.INVALID];
         // Unlike TemperatureUnit, SpeedUnit has no introspected to_real().
         // For DEFAULT the native widget falls back to our explicitly labelled string.
         switch (unit) {
