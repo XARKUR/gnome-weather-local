@@ -1,0 +1,12 @@
+build/
+tools/
+backups/
+dist/
+__pycache__/
+*.py[cod]
+.env
+.env.*
+!.env.example
+*.local.json
+*.log
+.DS_Store

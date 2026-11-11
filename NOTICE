@@ -1,0 +1,13 @@
+天气 · 本地版 is a modified build, not an official GNOME release.
+
+GNOME Weather 43.0 upstream source: https://gitlab.gnome.org/GNOME/gnome-weather
+The combined modified application is distributed under GPL-3.0-or-later.
+The original source, copyright headers and COPYING.md are preserved under upstream/.
+Most upstream code is GPL-2.0-or-later; some source files, including thermometer.js,
+are GPL-3.0-or-later. Artwork carries its own licenses and authorship; original assets
+and credits are retained. The new adapter/search/bridge code is GPL-2.0-or-later.
+
+Weather API: Open-Meteo (https://open-meteo.com/), CC BY 4.0 data attribution.
+Geocoding: Open-Meteo / GeoNames (https://www.geonames.org/).
+API terms: https://open-meteo.com/en/terms
+No weather API credentials are bundled.

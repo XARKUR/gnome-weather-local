@@ -1,0 +1,18 @@
+{
+  "project.py": "9e2ec14ee5fc27dc7a277f278869318781010dcd3f90a6b6f23a659bec77f7f9",
+  "po_compile.py": "ac5bcc997c12eb3431758c703a4cd49d073d240c00f9761113bd7d6c9bf33bc1",
+  "README.md": "d8454a90ed3f4485e3332f8bbf5013862e8fd2e7625e80f5fadeb1cdb9b2ccbd",
+  "NOTICE": "df3ca497126ef858ccab5e6b287ee00938d72279cd6f0d958b3a2a317f4437f0",
+  "upstream.lock.json": "d3e58469989d57f8fa7da25a3073591e6d5dcd078e24fdf4eceae49c80a78d1c",
+  "overrides/bridge.js": "456a3f0a889c9b14f4a22bfe7f04ddd77f25502c32bb00e9cc6a9ccbef0b8076",
+  "overrides/entry.js": "e095953568d306bafc3acff6d8cda1f995b99b178332cd41fc3ab82f22a40f84",
+  "overrides/provider.js": "6b004b5a829afeb449ba1e707c7b2fbe03490e83444c0b6972cb5f64ca5d8f78",
+  "overrides/regions.js": "9f81ac1a36ba6bb568756b0e9718af42a6649f300286ee561523046f17132c92",
+  "tests/bridge.js": "422078d267c66b88dca6ce19f18a3163e47e600cd638d0d77fe95302a4928202",
+  "tests/live.js": "44b7bc6af794aecee8ce3a1c1adca75ee26a00d37b2b3136cf97443629985575",
+  "tests/native-weather.json": "884ff16206761f1860c2487022a6bf3f546f5587f99536ad4c1f3cf7517948f4",
+  "tests/provider.js": "152f3be00942b83033ba75f319f488ebadfd3832fff85a1ce19a842a04cbf08d",
+  "tests/ui.js": "84b0b59143e8f72712c54e1f148e8423a65528dec33b7bf8d8f3c86cfb4c2824",
+  "po/zh_CN.po": "aea33ec07dc99aef8219467e634d12acb33d42e088b6b9c70ffe11835035083f",
+  "tests/regions-live.js": "525073d956de64b981f1e4f117713851fda22fd256c8fb7458d12d9be0d8c89f"
+}

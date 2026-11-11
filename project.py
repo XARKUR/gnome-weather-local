@@ -1,0 +1,268 @@
+#!/usr/bin/env python3
+"""Build a source-pinned GNOME Weather fork and matching Shell bridge. No sudo."""
+import argparse
+import hashlib
+import json
+import os
+from pathlib import Path
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+import zipfile
+from po_compile import compile_catalog
+
+ROOT = Path(__file__).resolve().parent
+UPSTREAM = ROOT / 'upstream/gnome-weather-43.0'
+BUILD = ROOT / 'build'
+APP_ID = 'org.gnome.Weather.Local'
+UUID = 'weather@system.local'
+
+
+def run(*args, **kwargs):
+    return subprocess.run([str(a) for a in args], check=True, **kwargs)
+
+
+def replace(path, old, new):
+    source = path.read_text()
+    if source.count(old) != 1:
+        raise ValueError(f'Unexpected upstream source: {path.name}: {old}')
+    path.write_text(source.replace(old, new))
+
+
+def build():
+    source = BUILD / 'source'
+    if source.exists():
+        shutil.rmtree(source)
+    shutil.copytree(UPSTREAM, source)
+    shutil.copyfile(ROOT / 'LICENSE-GPL-3', source / 'COPYING-GPL-3')
+    for file in (source / 'src').rglob('*.js'):
+        text = file.read_text().replace("'org.gnome.Weather'", repr(APP_ID))
+        file.write_text(text)
+    for file in list((source / 'data').glob('*.ui')) + list((source / 'src').rglob('*.ui')):
+        file.write_text(file.read_text().replace('<interface>', '<interface domain="org.gnome.Weather.Local">'))
+    shutil.copyfile(ROOT / 'overrides/entry.js', source / 'src/app/entry.js')
+    shutil.copyfile(ROOT / 'overrides/provider.js', source / 'src/shared/provider.js')
+    shutil.copyfile(ROOT / 'overrides/regions.js', source / 'src/shared/regions.js')
+    model = source / 'src/shared/world.js'
+    replace(model, "import GWeather from 'gi://GWeather';", "import GWeather from 'gi://GWeather';\nimport {OpenMeteoInfo} from './provider.js';")
+    replace(model, 'return new GWeather.Info({', 'return new OpenMeteoInfo({')
+    application = source / 'src/app/application.js'
+    replace(application, 'this.currentLocationController = new CurrentLocationController.CurrentLocationController(this.model);',
+            'this.currentLocationController = {autoLocationAvailable: false, currentLocation: null};')
+    replace(application, 'Gtk.Window.set_default_icon_name(pkg.name);', "Gtk.Window.set_default_icon_name('org.gnome.Weather');")
+    replace(application, 'GLib.set_application_name(name_prefix + _("Weather"));', "GLib.set_application_name('天气 · 本地版');")
+    replace(source / 'src/app/window.js', 'this._searchView.icon_name = pkg.name;', "this._searchView.icon_name = 'org.gnome.Weather';")
+    replace(source / 'src/app/window.js', 'application_name: _("Weather"),', "application_name: '天气 · 本地版',")
+    replace(source / 'src/app/window.js', 'developer_name: _("The GNOME Project"),', "developer_name: 'GNOME Weather contributors / 本地修改版',")
+    replace(source / 'src/app/window.js', 'application_icon: pkg.name,', "application_icon: 'org.gnome.Weather',")
+    replace(source / 'src/misc/util.js', "import GWeather from 'gi://GWeather';",
+            "import GWeather from 'gi://GWeather';\nimport {getProvince} from '../shared/regions.js';")
+    replace(source / 'src/misc/util.js', 'function getNameAndCountry(location) {', '''function getNameAndCountry(location) {
+    // Use saved administrative metadata; never infer a detached location's country.
+    const province = getProvince(location);
+    if (province) return [location.get_name(), province];
+    return [location.get_name()];''')
+    # The old country lookup is unreachable; remove it from the generated source.
+    utility = source / 'src/misc/util.js'
+    text = utility.read_text()
+    start = text.index('    let country = location.get_parent();', text.index('function getNameAndCountry'))
+    end = text.index('\n}', start)
+    utility.write_text(text[:start] + text[end:])
+    world = source / 'src/app/world.js'
+    replace(world, "import * as Util from '../misc/util.js';",
+            "import * as Util from '../misc/util.js';\nimport {ensureProvince} from '../shared/regions.js';")
+    replace(world, "        grid.connect('remove', () => {", '''        if (!countryName)
+            ensureProvince(location).then(province => { grid.countryName = province; }).catch(error => log(error.message));
+
+        grid.connect('remove', () => {''')
+    compile_catalog(ROOT / 'po/zh_CN.po', BUILD / 'locale/zh_CN/LC_MESSAGES' / (APP_ID + '.mo'))
+    resources = BUILD / 'resources'
+    resources.mkdir(exist_ok=True)
+    compiler = shutil.which('glib-compile-resources')
+    if not compiler:
+        local = ROOT / 'tools/glib/usr/bin/glib-compile-resources'
+        if local.is_file():
+            compiler = str(local)
+    if not compiler:
+        raise RuntimeError('Build dependency missing: glib-compile-resources (Debian 13: libgio-2.0-dev-bin; Debian 12: libglib2.0-dev-bin; Arch: glib2).')
+    xml = (source / 'data/org.gnome.Weather.data.gresource.xml').read_text().replace(' preprocess="xml-stripblanks"', '')
+    manifest = resources / 'app.gresource.xml'
+    manifest.write_text(xml)
+    run(compiler, manifest, '--sourcedir', source / 'data', '--target', resources / 'app.gresource')
+    schema = (source / 'data/org.gnome.Weather.gschema.xml').read_text().replace('id="org.gnome.Weather"', f'id="{APP_ID}"').replace('path="/org/gnome/Weather/"', 'path="/org/gnome/Weather/Local/"')
+    schema = schema.replace('  </schema>', '''    <key name="location-regions" type="a{ss}">
+      <default>{}</default>
+      <summary>Saved province or state by geographic coordinates</summary>
+    </key>
+  </schema>''')
+    schema_dir = BUILD / 'schemas'
+    schema_dir.mkdir(exist_ok=True)
+    (schema_dir / (APP_ID + '.gschema.xml')).write_text(schema)
+    run('glib-compile-schemas', '--strict', schema_dir)
+    (BUILD / 'bootstrap.js').write_text('''// Generated launch environment; source modules are in build/source/src.
+import Gio from 'gi://Gio';
+import GLib from 'gi://GLib';
+import Gtk from 'gi://Gtk?version=4.0';
+import Gdk from 'gi://Gdk?version=4.0';
+const root = GLib.path_get_dirname(GLib.filename_from_uri(import.meta.url)[0]);
+Gio.resources_register(Gio.Resource.load(root + '/resources/app.gresource'));
+Gtk.init();
+Gtk.IconTheme.get_for_display(Gdk.Display.get_default()).add_search_path(root + '/source/data/icons');
+globalThis.pkg = {
+    name: 'org.gnome.Weather.Local', version: '0.1 (based on GNOME Weather 43.0)',
+    initFormat() {String.prototype.format = imports.format.format;},
+    initGettext() {
+        imports.gettext.bindtextdomain('org.gnome.Weather.Local', root + '/locale');
+        imports.gettext.textdomain('org.gnome.Weather.Local');
+        const gettext = imports.gettext.domain('org.gnome.Weather.Local');
+        globalThis._ = gettext.gettext;
+        globalThis.C_ = gettext.pgettext;
+    },
+};
+''')
+    (BUILD / 'app.js').write_text("import './bootstrap.js';\nimport './source/src/app/main.js';\n")
+    launcher = BUILD / 'weather-local'
+    launcher.write_text('''#!/bin/sh
+set -eu
+project_build=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+export GSETTINGS_SCHEMA_DIR="$project_build/schemas"
+export LC_ALL=zh_CN.UTF-8
+export LANGUAGE=zh_CN:zh
+exec gjs -m "$project_build/app.js" "$@"
+''')
+    launcher.chmod(0o755)
+    for major in ['43', 'modern']:
+        bridge = BUILD / ('bridge-' + major)
+        bridge.mkdir(exist_ok=True)
+        (bridge / 'schemas').mkdir(exist_ok=True)
+        shutil.copyfile(schema_dir / (APP_ID + '.gschema.xml'), bridge / 'schemas' / (APP_ID + '.gschema.xml'))
+        metadata = dict(uuid=UUID, name='天气 · 本地版', description='Open-Meteo 天气来源；与天气 · 本地版应用同步地点。', version=1)
+        metadata['shell-version'] = ['43'] if major == '43' else ['48', '51']
+        (bridge / 'metadata.json').write_text(json.dumps(metadata, ensure_ascii=False, indent=2) + '\n')
+        if major == 'modern':
+            for file in ['provider.js', 'bridge.js']:
+                shutil.copyfile(ROOT / 'overrides' / file, bridge / file)
+            (bridge / 'extension.js').write_text('''import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
+import * as Main from 'resource:///org/gnome/shell/ui/main.js';
+import {WeatherBridge} from './bridge.js';
+export default class extends Extension {
+    enable() {
+        try { this._bridge = new WeatherBridge(Main.panel.statusArea.dateMenu._weatherItem, this.getSettings('org.gnome.Weather.Local')); }
+        catch (error) {this.disable(); throw error;}
+    }
+    disable() {this._bridge?.destroy(); this._bridge = null;}
+}
+''')
+        else:
+            provider = (ROOT / 'overrides/provider.js').read_text()
+            provider = re.sub(r'^import .*?;\n', '', provider, flags=re.M).replace('export ', '')
+            (bridge / 'provider.js').write_text('const {Gio, GLib, GObject, GWeather, Soup} = imports.gi;\nvar Provider = (() => {\n' + provider + '\nreturn {OpenMeteoInfo};\n})();\n')
+            adapter = (ROOT / 'overrides/bridge.js').read_text()
+            adapter = re.sub(r'^import .*?;\n', '', adapter, flags=re.M).replace('export class WeatherBridge', 'var WeatherBridge = class WeatherBridge')
+            (bridge / 'bridge.js').write_text('const {Gio, GWeather} = imports.gi;\nconst Me = imports.misc.extensionUtils.getCurrentExtension();\nconst {OpenMeteoInfo} = Me.imports.provider.Provider;\n' + adapter)
+            (bridge / 'extension.js').write_text('''const Main = imports.ui.main;
+const ExtensionUtils = imports.misc.extensionUtils;
+const Me = ExtensionUtils.getCurrentExtension();
+class Extension {
+    enable() {
+        try {this._bridge = new Me.imports.bridge.WeatherBridge(Main.panel.statusArea.dateMenu._weatherItem, ExtensionUtils.getSettings('org.gnome.Weather.Local'));}
+        catch (error) {this.disable(); throw error;}
+    }
+    disable() {this._bridge?.destroy(); this._bridge = null;}
+}
+function init() {return new Extension();}
+''')
+        shutil.copyfile(UPSTREAM / 'COPYING.md', bridge / 'COPYING.md')
+        run('glib-compile-schemas', '--strict', bridge / 'schemas')
+        dist = ROOT / 'dist'
+        dist.mkdir(exist_ok=True)
+        package = dist / (UUID + ('-gnome43' if major == '43' else '') + '.zip')
+        with zipfile.ZipFile(package, 'w', zipfile.ZIP_DEFLATED) as archive:
+            for file in sorted(bridge.rglob('*')):
+                if file.is_file() and file.name != 'gschemas.compiled':
+                    info = zipfile.ZipInfo(file.relative_to(bridge).as_posix(), (2026, 1, 1, 0, 0, 0))
+                    info.compress_type = zipfile.ZIP_DEFLATED
+                    info.external_attr = 0o100644 << 16
+                    archive.writestr(info, file.read_bytes())
+        package.with_suffix('.zip.sha256').write_text(hashlib.sha256(package.read_bytes()).hexdigest() + '  ' + package.name + '\n')
+    print('Built app and GNOME 43 / 48 / 51 weather bridges:', BUILD)
+
+
+def check(live=False):
+    run('gjs', '-m', ROOT / 'tests/provider.js')
+    node = shutil.which('node')
+    if not node:
+        node = str(sorted((Path.home() / '.local/share/fnm/node-versions').glob('*/installation/bin/node'))[-1])
+    for directory in [ROOT / 'overrides', BUILD / 'source/src']:
+        for file in directory.rglob('*.js'):
+            run(node, '--input-type=module', '--check', input=file.read_bytes())
+    for file in (BUILD / 'bridge-43').glob('*.js'):
+        run(node, '--check', file)
+    for file in (BUILD / 'bridge-modern').glob('*.js'):
+        run(node, '--input-type=module', '--check', input=file.read_bytes())
+    with tempfile.TemporaryDirectory(prefix='weather-check-') as temp:
+        env = dict(os.environ, GSETTINGS_BACKEND='memory', GSETTINGS_SCHEMA_DIR=str(BUILD / 'schemas'), XDG_CACHE_HOME=temp,
+                   LC_ALL='zh_CN.UTF-8', LANGUAGE='zh_CN:zh')
+        run('gjs', '-m', ROOT / 'tests/bridge.js', env=env)
+        run('gjs', '-m', ROOT / 'tests/ui.js', env=env)
+        if live:
+            run('gjs', '-m', ROOT / 'tests/live.js', env=dict(env, XDG_CACHE_HOME=str(Path(temp) / 'live')))
+            run('gjs', '-m', ROOT / 'tests/regions-live.js', env=env)
+
+
+def install():
+    if os.geteuid() == 0:
+        raise RuntimeError('Run as the desktop user, without sudo.')
+    target = Path.home() / '.local/share/system-weather'
+    if target.exists():
+        raise RuntimeError('Already installed. Back up/remove the old user copy before updating.')
+    shell = subprocess.check_output(['gnome-shell', '--version'], text=True)
+    major = re.search(r'Shell (\d+)', shell)[1]
+    if major not in ['43', '48', '51']:
+        raise RuntimeError('Bridge requires GNOME 43, 48 or 51.')
+    extension = Path.home() / '.local/share/gnome-shell/extensions' / UUID
+    if extension.exists():
+        raise RuntimeError('Refusing to overwrite existing weather bridge.')
+    desktop = Path.home() / '.local/share/applications' / (APP_ID + '.desktop')
+    if desktop.exists():
+        raise RuntimeError('Refusing to overwrite an existing launcher.')
+    # Only the runnable files, not development logs or tests, go into user data.
+    target.mkdir(parents=True)
+    for directory in ['source', 'resources', 'schemas', 'locale']:
+        shutil.copytree(BUILD / directory, target / directory)
+    for name in ['app.js', 'bootstrap.js', 'weather-local']:
+        shutil.copy2(BUILD / name, target / name)
+    for name in ['README.md', 'NOTICE', 'upstream.lock.json']:
+        shutil.copyfile(ROOT / name, target / name)
+    desktop.parent.mkdir(parents=True, exist_ok=True)
+    desktop.write_text(f'''[Desktop Entry]
+Type=Application
+Name=天气 · 本地版
+Comment=Open-Meteo 天气，支持城市搜索和自定义经纬度
+Exec="{target / 'weather-local'}"
+Icon=org.gnome.Weather.Local
+Terminal=false
+StartupNotify=true
+Categories=GNOME;GTK;Utility;
+''')
+    icons = Path.home() / '.local/share/icons/hicolor/scalable/apps'
+    icons.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(target / 'source/data/icons/hicolor/scalable/apps/org.gnome.Weather.svg', icons / (APP_ID + '.svg'))
+    shutil.copytree(BUILD / ('bridge-43' if major == '43' else 'bridge-modern'), extension)
+    print('Installed separate user app and disabled bridge. Original GNOME Weather unchanged.')
+    print('Enable bridge after logout/login:', UUID)
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('command', choices=['build', 'check', 'install'])
+    parser.add_argument('--live', action='store_true', help='Test the two public APIs with the requested city names')
+    parser.add_argument('--apply', action='store_true')
+    args = parser.parse_args()
+    if args.command == 'install' and not args.apply:
+        parser.error('install requires --apply')
+    if args.command == 'build': build()
+    elif args.command == 'check': check(args.live)
+    else: install()

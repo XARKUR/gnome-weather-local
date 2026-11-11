@@ -1,0 +1,10 @@
+{
+  "name": "GNOME Weather",
+  "version": "43.0",
+  "source": "https://download.gnome.org/sources/gnome-weather/43/gnome-weather-43.0.tar.xz",
+  "sha256": "2f11117f75552bf1bb9e01f01cfb3c2fcda6a3f69070ffe0519a0761532b8f26",
+  "checksum_source": "https://download.gnome.org/sources/gnome-weather/43/gnome-weather-43.0.sha256sum",
+  "upstream_repository": "https://gitlab.gnome.org/GNOME/gnome-weather",
+  "reason": "Match installed GNOME 43.9 / Weather 43 runtime; modern Shell adapters generated separately",
+  "license": "GPL-2.0-or-later with GPL-3.0-or-later source files and separately licensed artwork; original notices retained"
+}
