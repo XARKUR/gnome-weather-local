@@ -1,3 +1,4 @@
+import './isolated.js';
 // End-to-end new-location selection with real API results and isolated settings.
 import '../build/bootstrap.js';
 import Adw from 'gi://Adw';

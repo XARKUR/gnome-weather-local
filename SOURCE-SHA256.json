@@ -8,15 +8,16 @@
   "overrides/entry.js": "e095953568d306bafc3acff6d8cda1f995b99b178332cd41fc3ab82f22a40f84",
   "overrides/provider.js": "6b004b5a829afeb449ba1e707c7b2fbe03490e83444c0b6972cb5f64ca5d8f78",
   "overrides/regions.js": "9f81ac1a36ba6bb568756b0e9718af42a6649f300286ee561523046f17132c92",
-  "tests/bridge.js": "422078d267c66b88dca6ce19f18a3163e47e600cd638d0d77fe95302a4928202",
-  "tests/live.js": "44b7bc6af794aecee8ce3a1c1adca75ee26a00d37b2b3136cf97443629985575",
+  "tests/bridge.js": "f48a541347dce4fce9295e48656e99dcd3396207d0545cb8be7599b9afe9fb4f",
+  "tests/live.js": "7c3ae9ed30a8cc0bef4639aceaec9f4768f7164a49082c7ac1adc8887bcde1c4",
   "tests/native-weather.json": "884ff16206761f1860c2487022a6bf3f546f5587f99536ad4c1f3cf7517948f4",
-  "tests/provider.js": "152f3be00942b83033ba75f319f488ebadfd3832fff85a1ce19a842a04cbf08d",
-  "tests/ui.js": "769f15b7b53329aef38be562d6903af9c13874caa2b827317b9c89de1ba96bd2",
+  "tests/provider.js": "e1fab9c76977013c811cf56797f2cab3dde5cb0d8a875913557f260bd42f2f8e",
+  "tests/ui.js": "a12d05a5002ec3597aaf9a2154d829e5198bd3b9fb9b667e3c72868871859f29",
   "po/zh_CN.po": "aea33ec07dc99aef8219467e634d12acb33d42e088b6b9c70ffe11835035083f",
-  "tests/regions-live.js": "525073d956de64b981f1e4f117713851fda22fd256c8fb7458d12d9be0d8c89f",
+  "tests/regions-live.js": "a714151bad028f03d40438d54cf46cc01c6785ccaed7fa0192341473f9cbf0d9",
   "install.sh": "94c44ad93d347e81e9f8224a619c2c9ed6463263df2522d7a7b6d29d0f0338ca",
   "resources/app.gresource": "f9520d11019732bab2b666e3accddfe569bb299812c162160678f22d3e532866",
   "resources/manifest.json": "5fe162cc7e9f9160acfeb43c78051810cad47f6f366bf47e934224037d170a1b",
-  "tests/test_setup.py": "9342e7374595e7545064e097cc92e9e6cf1e2bfdc2df5046753c113ff9ec84af"
+  "tests/test_setup.py": "9342e7374595e7545064e097cc92e9e6cf1e2bfdc2df5046753c113ff9ec84af",
+  "tests/isolated.js": "f37c7363166ad56a5b0d6fb9014cd49d682343ca62d84bcf38436b95d8de0e7e"
 }

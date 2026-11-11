@@ -1,3 +1,4 @@
+import './isolated.js';
 import GLib from 'gi://GLib';
 import GWeather from 'gi://GWeather?version=4.0';
 import {searchLocations, OpenMeteoInfo} from '../overrides/provider.js';

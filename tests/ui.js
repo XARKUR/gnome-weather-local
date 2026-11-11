@@ -1,3 +1,4 @@
+import './isolated.js';
 import '../build/bootstrap.js';
 import Gtk from 'gi://Gtk?version=4.0';
 import {WeatherApplication} from '../build/source/src/app/application.js';
@@ -63,6 +64,12 @@ model.disconnect(signal);
 model.buildInfo = originalBuildInfo;
 print('Location list: add, select, delete, native GTK binding and synchronous cached updates passed.');
 window.showInfo(info, false);
+const daily = window._cityView._infoPage._forecastDaily;
+let dayWidgets = 0;
+for (let child = daily.get_first_child(); child; child = child.get_next_sibling()) dayWidgets++;
+if (daily._preprocess(info.get_forecast_list()).days.length < 5 || dayWidgets < 4)
+    throw new Error('Daily forecast did not render multiple future days');
+print('Daily forecast: multiple future days rendered, rather than the unavailable label.');
 const stack = window._cityView.getForecastStack();
 const titles = ['hourly', 'daily'].map(name => stack.get_page(stack.get_child_by_name(name)).get_title());
 if (titles.join(', ') !== '每小时, 每天')

@@ -1,3 +1,4 @@
+import './isolated.js';
 // Actual Shell weather-section methods, with simulated St actors, real GWeather
 // adapter objects, isolated GSettings and a local weather-cache fixture.
 import Gio from 'gi://Gio';
