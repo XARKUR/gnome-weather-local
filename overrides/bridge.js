@@ -13,6 +13,8 @@ class WeatherClient {
         this._listeners = new Map();
         this._nextId = 1;
         this._settingsSignal = settings.connect('changed::locations', () => this._load());
+        this._unitSettings = new Gio.Settings({schema_id: 'org.gnome.GWeather4'});
+        this._unitSignal = this._unitSettings.connect('changed::temperature-unit', () => this._changed());
         this._load();
     }
     connect(signal, callback) {
@@ -47,6 +49,7 @@ class WeatherClient {
     activateApp() {Gio.DesktopAppInfo.new('org.gnome.Weather.Local.desktop')?.launch([], null);}
     destroy() {
         this.settings.disconnect(this._settingsSignal);
+        this._unitSettings.disconnect(this._unitSignal);
         if (this.info) {this.info.disconnect(this._infoSignal); this.info.abort();}
         this._listeners.clear();
     }

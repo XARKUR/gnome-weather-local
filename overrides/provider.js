@@ -7,6 +7,13 @@ import Soup from 'gi://Soup?version=3.0';
 
 const session = new Soup.Session({timeout: 20, user_agent: 'SystemWeather/0.1 (GNOME Weather local fork)'});
 const FRESH = 15 * 60 * 1000, MAX_STALE = 24 * 60 * 60 * 1000;
+const unitSettings = new Gio.Settings({schema_id: 'org.gnome.GWeather4'});
+function temperatureUnit(unit) {
+    // to_real(DEFAULT) resolves the locale, not the user's saved preference.
+    if (unit === GWeather.TemperatureUnit.DEFAULT)
+        unit = unitSettings.get_enum('temperature-unit');
+    return GWeather.TemperatureUnit.to_real(unit);
+}
 export function coordinates(latitude, longitude) {
     if (!Number.isFinite(latitude) || !Number.isFinite(longitude) ||
         Math.abs(latitude) > 90 || Math.abs(longitude) > 180)
@@ -154,14 +161,14 @@ class OpenMeteoInfo extends GWeather.Info {
     get_value_update() {return [this.is_valid(), this._sample?.time || 0];}
     get_value_temp(unit) {
         let value = this._sample?.temperature_2m;
-        const real = GWeather.TemperatureUnit.to_real(unit);
+        const real = temperatureUnit(unit);
         if (real === GWeather.TemperatureUnit.FAHRENHEIT) value = value * 9 / 5 + 32;
         else if (real === GWeather.TemperatureUnit.KELVIN) value += 273.15;
         return [Number.isFinite(value), value ?? NaN];
     }
     get_value_apparent(unit) {
         const value = this._sample?.apparent_temperature;
-        const real = GWeather.TemperatureUnit.to_real(unit);
+        const real = temperatureUnit(unit);
         return [Number.isFinite(value), real === GWeather.TemperatureUnit.FAHRENHEIT ? value * 9 / 5 + 32 :
             real === GWeather.TemperatureUnit.KELVIN ? value + 273.15 : value];
     }

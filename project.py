@@ -74,6 +74,19 @@ def build():
             'this.currentLocationController = {autoLocationAvailable: false, currentLocation: null};')
     replace(application, 'Gtk.Window.set_default_icon_name(pkg.name);', "Gtk.Window.set_default_icon_name('org.gnome.Weather');")
     replace(application, 'GLib.set_application_name(name_prefix + _("Weather"));', "GLib.set_application_name('天气 · 本地版');")
+    replace(application, '''        gwSettings.connect('changed::temperature-unit', function () {
+            temperatureAction.state = resolveDefaultTemperatureUnit(gwSettings.get_enum('temperature-unit'));
+        });''', '''        gwSettings.connect('changed::temperature-unit', () => {
+            temperatureAction.state = resolveDefaultTemperatureUnit(gwSettings.get_enum('temperature-unit'));
+            for (const window of this.get_windows()) window._cityView?.refreshUnits();
+        });''')
+    replace(source / 'src/app/city.js', '''    update() {
+        this._stack.visible_child_name = 'loading';''', '''    refreshUnits() {
+        if (this._info?.is_valid()) this._onUpdate(this._info);
+    }
+
+    update() {
+        this._stack.visible_child_name = 'loading';''')
     replace(source / 'src/app/window.js', 'this._searchView.icon_name = pkg.name;', "this._searchView.icon_name = 'org.gnome.Weather';")
     replace(source / 'src/app/window.js', 'application_name: _("Weather"),', "application_name: '天气 · 本地版',")
     replace(source / 'src/app/window.js', 'developer_name: _("The GNOME Project"),', "developer_name: 'GNOME Weather contributors / 本地修改版',")
@@ -143,7 +156,7 @@ Gio.resources_register(Gio.Resource.load(root + '/resources/app.gresource'));
 Gtk.init();
 Gtk.IconTheme.get_for_display(Gdk.Display.get_default()).add_search_path(root + '/source/data/icons');
 globalThis.pkg = {
-    name: 'org.gnome.Weather.Local', version: '0.1 (based on GNOME Weather 43.0)',
+    name: 'org.gnome.Weather.Local', version: '0.1.1 (based on GNOME Weather 43.0)',
     initFormat() {String.prototype.format = imports.format.format;},
     initGettext() {
         imports.gettext.bindtextdomain('org.gnome.Weather.Local', root + '/locale');
@@ -170,7 +183,7 @@ exec gjs -m "$project_build/app.js" "$@"
         bridge.mkdir(exist_ok=True)
         (bridge / 'schemas').mkdir(exist_ok=True)
         shutil.copyfile(schema_dir / (APP_ID + '.gschema.xml'), bridge / 'schemas' / (APP_ID + '.gschema.xml'))
-        metadata = dict(uuid=UUID, name='天气 · 本地版', description='Open-Meteo 天气来源；与天气 · 本地版应用同步地点。', version=1)
+        metadata = dict(uuid=UUID, name='天气 · 本地版', description='Open-Meteo 天气来源；与天气 · 本地版应用同步地点。', version=2)
         metadata['shell-version'] = ['43'] if major == '43' else ['48', '51']
         (bridge / 'metadata.json').write_text(json.dumps(metadata, ensure_ascii=False, indent=2) + '\n')
         if major == 'modern':

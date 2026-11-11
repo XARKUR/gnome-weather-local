@@ -16,6 +16,8 @@ const fixturesPath = GLib.build_filenamev([GLib.path_get_dirname(GLib.filename_f
 const [, bytes] = GLib.file_get_contents(fixturesPath);
 const fixtures = JSON.parse(new TextDecoder().decode(bytes));
 const settings = new Gio.Settings({schema_id: 'org.gnome.Weather.Local'});
+const units = new Gio.Settings({schema_id: 'org.gnome.GWeather4'});
+units.set_string('temperature-unit', 'centigrade');
 const location = GWeather.Location.new_detached('高州', null, 21.91965, 110.85678);
 const [lat, lon] = location.get_coords();
 const path = GLib.build_filenamev([GLib.get_user_cache_dir(), 'system-weather', `${lat.toFixed(5)}_${lon.toFixed(5)}.json`]);
@@ -47,6 +49,10 @@ for (const [version, fixture] of Object.entries(fixtures)) {
         assert(section._titleLocation.text === '高州', 'Custom location name lost');
         assert(section._forecastGrid.children.length === 15, 'Native five-hour card failed');
         assert(section._weatherClient.info instanceof GWeather.Info, 'Native info contract');
+        units.set_string('temperature-unit', 'fahrenheit');
+        assert(section._forecastGrid.children[2].text.trim() === '68°', 'Calendar did not redraw in Fahrenheit');
+        units.set_string('temperature-unit', 'centigrade');
+        assert(section._forecastGrid.children[2].text.trim() === '20°', 'Calendar did not redraw in Celsius');
         bridge.destroy(); bridge.destroy();
         assert(section._weatherClient === original, 'Original weather client not restored');
         assert(section._findBestLocationName === originalName, 'Original location method not restored');

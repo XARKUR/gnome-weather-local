@@ -1,6 +1,7 @@
 import './isolated.js';
 import GLib from 'gi://GLib';
 import GWeather from 'gi://GWeather?version=4.0';
+import Gio from 'gi://Gio';
 import {coordinates, manualLocation, validateForecast, describe, OpenMeteoInfo} from '../overrides/provider.js';
 function assert(value, message) {if (!value) throw new Error(message);}
 function throws(fn) {let threw = false; try {fn();} catch (_) {threw = true;} assert(threw, 'Expected rejection');}
@@ -27,6 +28,13 @@ assert(info.get_value_temp(GWeather.TemperatureUnit.FAHRENHEIT)[1] === 68, 'Temp
 assert(info.get_value_wind(GWeather.SpeedUnit.MS)[1] === 10, 'Wind units');
 assert(info.get_symbolic_icon_name() === 'weather-clear-night-symbolic', 'Native card icon');
 info._apply(data);
+const units = new Gio.Settings({schema_id: 'org.gnome.GWeather4'});
+units.set_string('temperature-unit', 'fahrenheit');
+assert(info.get_value_temp(GWeather.TemperatureUnit.DEFAULT)[1] === 68, 'Default ignores saved Fahrenheit preference');
+assert(Math.abs(info.get_value_apparent(GWeather.TemperatureUnit.DEFAULT)[1] - 64.4) < 0.001, 'Apparent temperature unit');
+assert(info.get_forecast_list()[0].get_value_temp(GWeather.TemperatureUnit.DEFAULT)[1] === 68, 'Hourly units');
+units.set_string('temperature-unit', 'centigrade');
+assert(info.get_value_temp(GWeather.TemperatureUnit.DEFAULT)[1] === 20, 'Switch back to Celsius');
 assert(info.get_forecast_list().length === 2, 'Hourly forecast conversion');
 assert(info.get_forecast_list()[0] instanceof GWeather.Info, 'Typed forecast sample');
 info.abort();

@@ -70,6 +70,20 @@ for (let child = daily.get_first_child(); child; child = child.get_next_sibling(
 if (daily._preprocess(info.get_forecast_list()).days.length < 5 || dayWidgets < 4)
     throw new Error('Daily forecast did not render multiple future days');
 print('Daily forecast: multiple future days rendered, rather than the unavailable label.');
+const fetchedAt = info._fetchedAt;
+this.activate_action('temperature-unit', new GLib.Variant('s', 'fahrenheit'));
+const weather = window._cityView._infoPage;
+if (weather._temperatureLabel.label !== '68°' || !weather._apparentLabel.label.includes('66'))
+    throw new Error('Actual menu action did not redraw current/apparent temperatures');
+if (weather._forecastHourly.get_first_child()._forecastTemperatureLabel.label !== '68°')
+    throw new Error('Hourly temperatures did not redraw in Fahrenheit');
+if (weather._forecastDaily.get_first_child().minTemp !== 68 || weather._forecastDaily.get_first_child().maxTemp !== 68)
+    throw new Error('Daily temperatures did not redraw in Fahrenheit');
+this.activate_action('temperature-unit', new GLib.Variant('s', 'centigrade'));
+if (weather._temperatureLabel.label !== '20°' || weather._forecastDaily.get_first_child().minTemp !== 20)
+    throw new Error('Switching back to Celsius did not redraw');
+if (info._fetchedAt !== fetchedAt || info._pending) throw new Error('Unit switch unexpectedly requested new weather');
+print('Temperature menu: Celsius/Fahrenheit changes redraw current, apparent, hourly and daily values without a new request.');
 const stack = window._cityView.getForecastStack();
 const titles = ['hourly', 'daily'].map(name => stack.get_page(stack.get_child_by_name(name)).get_title());
 if (titles.join(', ') !== '每小时, 每天')
