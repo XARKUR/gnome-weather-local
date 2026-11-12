@@ -75,7 +75,7 @@ def build():
     replace(application, 'this.currentLocationController = new CurrentLocationController.CurrentLocationController(this.model);',
             'this.currentLocationController = {autoLocationAvailable: false, currentLocation: null};')
     replace(application, 'Gtk.Window.set_default_icon_name(pkg.name);', "Gtk.Window.set_default_icon_name('org.gnome.Weather');")
-    replace(application, 'GLib.set_application_name(name_prefix + _("Weather"));', "GLib.set_application_name('gnome-weather-local');")
+    replace(application, 'GLib.set_application_name(name_prefix + _("Weather"));', "GLib.set_application_name('Gnome Weather');")
     replace(application, '''        gwSettings.connect('changed::temperature-unit', function () {
             temperatureAction.state = resolveDefaultTemperatureUnit(gwSettings.get_enum('temperature-unit'));
         });''', '''        gwSettings.connect('changed::temperature-unit', () => {
@@ -90,7 +90,7 @@ def build():
     update() {
         this._stack.visible_child_name = 'loading';''')
     replace(source / 'src/app/window.js', 'this._searchView.icon_name = pkg.name;', "this._searchView.icon_name = 'org.gnome.Weather';")
-    replace(source / 'src/app/window.js', 'application_name: _("Weather"),', "application_name: 'gnome-weather-local',")
+    replace(source / 'src/app/window.js', 'application_name: _("Weather"),', "application_name: 'Gnome Weather',")
     replace(source / 'src/app/window.js', 'developer_name: _("The GNOME Project"),', "developer_name: 'GNOME Weather contributors / 本地修改版',")
     replace(source / 'src/app/window.js', 'application_icon: pkg.name,', "application_icon: 'org.gnome.Weather',")
     replace(source / 'src/misc/util.js', "import GWeather from 'gi://GWeather';",
@@ -158,7 +158,7 @@ Gio.resources_register(Gio.Resource.load(root + '/resources/app.gresource'));
 Gtk.init();
 Gtk.IconTheme.get_for_display(Gdk.Display.get_default()).add_search_path(root + '/source/data/icons');
 globalThis.pkg = {
-    name: 'org.gnome.Weather.Local', version: '0.1.3 (based on GNOME Weather 43.0)',
+    name: 'org.gnome.Weather.Local', version: '0.1.4 (based on GNOME Weather 43.0)',
     initFormat() {String.prototype.format = imports.format.format;},
     initGettext() {
         imports.gettext.bindtextdomain('org.gnome.Weather.Local', root + '/locale');
@@ -185,7 +185,7 @@ exec gjs -m "$project_build/app.js" "$@"
         bridge.mkdir(exist_ok=True)
         (bridge / 'schemas').mkdir(exist_ok=True)
         shutil.copyfile(schema_dir / (APP_ID + '.gschema.xml'), bridge / 'schemas' / (APP_ID + '.gschema.xml'))
-        metadata = dict(uuid=UUID, name='gnome-weather-local', description='Open-Meteo 天气来源；与gnome-weather-local应用同步地点。', version=4)
+        metadata = dict(uuid=UUID, name='Gnome Weather', description='Open-Meteo 天气来源；与 Gnome Weather 应用同步地点。', version=5)
         metadata['shell-version'] = ['43'] if major == '43' else ['48', '51']
         (bridge / 'metadata.json').write_text(json.dumps(metadata, ensure_ascii=False, indent=2) + '\n')
         if major == 'modern':
@@ -295,7 +295,7 @@ def install():
         launcher = staging / 'launcher.desktop'
         launcher.write_text(f'''[Desktop Entry]
 Type=Application
-Name=gnome-weather-local
+Name=Gnome Weather
 Comment=Open-Meteo 天气，支持城市搜索和自定义经纬度
 Exec="{target / 'weather-local'}"
 Icon=org.gnome.Weather.Local
@@ -377,7 +377,7 @@ def setup():
             raise
     if backup:
         print('Previous installation backed up:', backup)
-    print('安装完成：从应用列表打开 gnome-weather-local。请注销并重新登录，以加载日历扩展。')
+    print('安装完成：从应用列表打开 Gnome Weather。请注销并重新登录，以加载日历扩展。')
 
 
 
